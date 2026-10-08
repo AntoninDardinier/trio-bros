@@ -114,7 +114,14 @@
     btn.disabled = false;
     btn.textContent = "Se connecter";
     if (error) {
-      $("#loginError").textContent = "Email ou mot de passe incorrect.";
+      const m = (error.message || "").toLowerCase();
+      let msg;
+      if (m.includes("invalid login credentials")) msg = "Email ou mot de passe incorrect.";
+      else if (m.includes("email not confirmed")) msg = "Compte pas encore confirmé dans Supabase (case « Auto Confirm User »).";
+      else if (m.includes("api key") || m.includes("apikey") || m.includes("jwt")) msg = "Clé Supabase invalide dans config.js.";
+      else if (m.includes("fetch") || m.includes("network")) msg = "Supabase injoignable : vérifie l'adresse dans config.js, ou le projet est en pause.";
+      else msg = "Erreur : " + error.message;
+      $("#loginError").textContent = msg;
       show("#loginError");
       return;
     }
