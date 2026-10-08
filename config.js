@@ -9,7 +9,7 @@ window.APP_CONFIG = {
   APP_NAME: "Nos Stickers",
 
   // L'adresse du projet, ex : "https://abcdefghijkl.supabase.co"
-  SUPABASE_URL: "https://tjlcdhkceoewjydiwlai.supabase.co/rest/v1/",
+  SUPABASE_URL: "https://tjlcdhkceoewjydiwlai.supabase.co/rest/v1",
 
   // La clé publique : "publishable key" (commence par sb_publishable_)
   // ou l'ancienne "anon public key" (longue suite commençant par eyJ...)
