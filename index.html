@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Nos Stickers</title>
+  <meta name="theme-color" content="#1f1b2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Nos Stickers">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Écran : configuration manquante -->
+  <section id="setup" class="screen hidden">
+    <div class="card">
+      <div class="logo">📍</div>
+      <h1>Presque prêt</h1>
+      <p>Il manque l'adresse et la clé Supabase dans <code>config.js</code>. Suis l'étape 2 du guide.</p>
+    </div>
+  </section>
+
+  <!-- Écran : connexion -->
+  <section id="login" class="screen hidden">
+    <form id="loginForm" class="card">
+      <div class="logo">📍</div>
+      <h1 class="app-name">Nos Stickers</h1>
+      <p class="muted">La carte de nos stickers à travers le monde.</p>
+      <label>Email<input id="email" type="email" autocomplete="email" required></label>
+      <label>Mot de passe<input id="password" type="password" autocomplete="current-password" required></label>
+      <p id="loginError" class="error hidden"></p>
+      <button type="submit" class="btn primary" id="loginBtn">Se connecter</button>
+    </form>
+  </section>
+
+  <!-- Écran : application -->
+  <section id="app" class="hidden">
+    <div id="map"></div>
+
+    <header class="topbar">
+      <div class="title">
+        <strong class="app-name">Nos Stickers</strong>
+        <span id="counter">…</span>
+      </div>
+      <button id="menuBtn" class="round" aria-label="Menu">☰</button>
+    </header>
+
+    <button id="locateBtn" class="round float-locate" aria-label="Me localiser">◎</button>
+    <button id="addBtn" class="btn primary fab">＋ Coller un sticker</button>
+
+    <!-- Mode placement -->
+    <div id="crosshair" aria-hidden="true"><div class="pin big"><span></span></div></div>
+    <div id="placeBar" class="placebar">
+      <p>Déplace la carte pour viser l'endroit exact</p>
+      <div class="row">
+        <button id="placeCancel" class="btn ghost">Annuler</button>
+        <button id="placeGps" class="btn ghost">◎ Ma position</button>
+        <button id="placeOk" class="btn primary">Poser ici</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feuille : nouveau sticker -->
+  <div id="formSheet" class="sheet">
+    <div class="sheet-inner">
+      <div class="grab"></div>
+      <h2>Nouveau sticker</h2>
+      <label class="photo-pick" id="photoPick">
+        <input id="photoInput" type="file" accept="image/*">
+        <img id="photoPreview" alt="" class="hidden">
+        <span id="photoHint">📷 Ajouter une photo</span>
+      </label>
+      <label>Un petit mot<textarea id="noteInput" rows="2" maxlength="280" placeholder="Ex : Barcelone, après le concert"></textarea></label>
+      <label>Date<input id="dateInput" type="date"></label>
+      <div class="row">
+        <button id="formCancel" class="btn ghost">Annuler</button>
+        <button id="formSave" class="btn primary">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feuille : détail d'un sticker -->
+  <div id="detailSheet" class="sheet">
+    <div class="sheet-inner">
+      <div class="grab"></div>
+      <div id="detailPhotoWrap" class="detail-photo"><img id="detailPhoto" alt=""></div>
+      <h2 id="detailPlace"></h2>
+      <p id="detailMeta" class="muted"></p>
+      <p id="detailNote" class="note"></p>
+      <div class="row">
+        <button id="detailDelete" class="btn danger hidden">Supprimer</button>
+        <button id="detailClose" class="btn primary">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feuille : menu -->
+  <div id="menuSheet" class="sheet">
+    <div class="sheet-inner">
+      <div class="grab"></div>
+      <h2 id="menuHello">Salut</h2>
+      <button id="installBtn" class="btn ghost wide hidden">📲 Installer l'app</button>
+      <div class="install-help">
+        <p><strong>Installer sur iPhone :</strong> dans Safari, bouton Partager ⬆️ puis « Sur l'écran d'accueil ».</p>
+        <p><strong>Installer sur Android :</strong> dans Chrome, menu ⋮ puis « Installer l'application » ou « Ajouter à l'écran d'accueil ».</p>
+      </div>
+      <button id="renameBtn" class="btn ghost wide">Changer mon prénom</button>
+      <button id="logoutBtn" class="btn ghost wide">Se déconnecter</button>
+      <button id="menuClose" class="btn primary wide">Fermer</button>
+    </div>
+  </div>
+
+  <!-- Feuille : prénom -->
+  <div id="nameSheet" class="sheet">
+    <form id="nameForm" class="sheet-inner">
+      <div class="grab"></div>
+      <h2>C'est quoi ton prénom ?</h2>
+      <p class="muted">Il s'affichera sur les stickers que tu poses.</p>
+      <label><input id="nameInput" type="text" maxlength="30" required placeholder="Ton prénom"></label>
+      <button type="submit" class="btn primary wide">Valider</button>
+    </form>
+  </div>
+
+  <div id="backdrop"></div>
+  <div id="photoFull" class="hidden"><img alt=""></div>
+  <div id="toast" class="hidden"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
