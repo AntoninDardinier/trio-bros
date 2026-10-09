@@ -23,6 +23,10 @@
   let profilesReady = true; // false si la table profiles n'existe pas encore
   let avatarFile = null;
   let shownProfile = null;
+  let photoUrls = {};       // chemin photo -> URL signée
+  let albumFilter = "all";
+  let albumList = [];       // stickers affichés dans l'album (ordre)
+  let viewerIndex = 0;
 
   /* ---------------- Utilitaires ---------------- */
   let toastTimer;
@@ -131,6 +135,7 @@
     setAvatar($("#meAvatar"), user.id);
     if (markersLayer) renderPins();
     if (shownProfile && $("#profileSheet").classList.contains("open")) renderProfile(shownProfile);
+    if (!$("#album").classList.contains("hidden")) renderAlbum();
   }
 
   /* ---------------- Démarrage ---------------- */
@@ -242,6 +247,7 @@
     pins = data || [];
     renderPins();
     if (shownProfile && $("#profileSheet").classList.contains("open")) renderProfile(shownProfile);
+    if (!$("#album").classList.contains("hidden")) renderAlbum();
   }
 
   function renderPins() {
@@ -656,6 +662,195 @@
     // Au premier lancement, la fiche profil reste ouverte tant que le prénom n'est pas choisi
     if ($("#editSheet").classList.contains("open") && editIsFirst) return;
     closeSheets();
+  });
+
+  /* ---------------- Album ---------------- */
+  async function signPhotos(list) {
+    const missing = [...new Set(list.map((p) => p.photo_path).filter((path) => path && !photoUrls[path]))];
+    if (!missing.length) return;
+    const res = await sb.storage.from(BUCKET).createSignedUrls(missing, 60 * 60 * 24);
+    (res.data || []).forEach((u) => { if (u.signedUrl) photoUrls[u.path] = u.signedUrl; });
+  }
+
+  function monthLabel(iso) {
+    const [y, m] = iso.split("-").map(Number);
+    const s = new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  function openAlbum() {
+    closeSheets();
+    show("#album");
+    renderAlbum();
+  }
+
+  function renderFilters() {
+    const box = $("#albumFilters");
+    box.textContent = "";
+    const opts = [["all", "Tous", null]].concat(crewIds().map((id) => [id, id === user.id ? "Moi" : nameOf(id) || "?", id]));
+    opts.forEach(([key, label, uid]) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip" + (albumFilter === key ? " active" : "");
+      if (uid) {
+        const av = document.createElement("span");
+        av.className = "avatar xs";
+        setAvatar(av, uid);
+        b.appendChild(av);
+      }
+      b.appendChild(document.createTextNode(label));
+      b.addEventListener("click", () => { albumFilter = key; renderAlbum(); });
+      box.appendChild(b);
+    });
+  }
+
+  async function renderAlbum() {
+    renderFilters();
+    albumList = pins
+      .filter((p) => albumFilter === "all" || p.created_by === albumFilter)
+      .sort((a, b) => (a.stuck_on < b.stuck_on ? 1 : a.stuck_on > b.stuck_on ? -1 : 0));
+
+    const nPhotos = albumList.filter((p) => p.photo_path).length;
+    const nCountries = new Set(albumList.map((p) => p.country).filter(Boolean)).size;
+    $("#albumCount").textContent = albumList.length
+      ? `${albumList.length} sticker${albumList.length > 1 ? "s" : ""} · ${nPhotos} photo${nPhotos > 1 ? "s" : ""} · ${nCountries} pays`
+      : "";
+
+    const body = $("#albumBody");
+    body.textContent = "";
+    if (!albumList.length) {
+      const e = document.createElement("div");
+      e.className = "album-empty";
+      e.innerHTML = "<div>📭</div><p>Pas encore de sticker ici.<br>Va en coller un !</p>";
+      body.appendChild(e);
+      return;
+    }
+
+    await signPhotos(albumList);
+
+    let currentMonth = null;
+    let grid = null;
+    albumList.forEach((p, i) => {
+      const month = monthLabel(p.stuck_on);
+      if (month !== currentMonth) {
+        currentMonth = month;
+        const h = document.createElement("h3");
+        h.className = "album-month";
+        h.textContent = month;
+        body.appendChild(h);
+        grid = document.createElement("div");
+        grid.className = "album-grid";
+        body.appendChild(grid);
+      }
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "album-card";
+      const ph = document.createElement("div");
+      ph.className = "album-photo";
+      const url = p.photo_path && photoUrls[p.photo_path];
+      if (url) {
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.alt = "";
+        img.src = url;
+        ph.appendChild(img);
+      } else {
+        ph.classList.add("no-photo");
+        ph.style.setProperty("--c", colorFor(p.created_by));
+        ph.innerHTML = "<span>📍</span>";
+      }
+      const av = document.createElement("span");
+      av.className = "avatar xs album-av";
+      setAvatar(av, p.created_by, p.author_name);
+      ph.appendChild(av);
+      const cap = document.createElement("div");
+      cap.className = "album-cap";
+      const t = document.createElement("strong");
+      t.textContent = p.place || "Sticker";
+      const d = document.createElement("span");
+      d.textContent = formatDate(p.stuck_on);
+      cap.append(t, d);
+      card.append(ph, cap);
+      card.addEventListener("click", () => openViewer(i));
+      grid.appendChild(card);
+    });
+  }
+
+  $("#albumBtn").addEventListener("click", openAlbum);
+  $("#albumBack").addEventListener("click", () => hide("#album"));
+
+  /* ---------------- Visionneuse ---------------- */
+  function openViewer(i) {
+    viewerIndex = i;
+    show("#viewer");
+    renderViewer();
+  }
+
+  function renderViewer() {
+    const p = albumList[viewerIndex];
+    if (!p) return;
+    $("#viewerPos").textContent = `${viewerIndex + 1} / ${albumList.length}`;
+    const url = p.photo_path && photoUrls[p.photo_path];
+    const img = $("#viewerImg");
+    if (url) {
+      img.src = url;
+      img.classList.remove("hidden");
+      hide("#viewerEmpty");
+    } else {
+      img.removeAttribute("src");
+      img.classList.add("hidden");
+      show("#viewerEmpty");
+    }
+    $("#viewerPlace").textContent = p.place || "Sticker";
+    setAvatar($("#viewerAuthorAv"), p.created_by, p.author_name);
+    $("#viewerAuthorName").textContent = nameOf(p.created_by, p.author_name) || "Quelqu'un";
+    $("#viewerDate").textContent = formatDate(p.stuck_on);
+    $("#viewerNote").textContent = p.note || "";
+    $("#viewerPrev").style.visibility = viewerIndex > 0 ? "visible" : "hidden";
+    $("#viewerNext").style.visibility = viewerIndex < albumList.length - 1 ? "visible" : "hidden";
+    // précharge la suivante
+    const next = albumList[viewerIndex + 1];
+    if (next && next.photo_path && photoUrls[next.photo_path]) new Image().src = photoUrls[next.photo_path];
+  }
+
+  function viewerStep(d) {
+    const n = viewerIndex + d;
+    if (n < 0 || n >= albumList.length) return;
+    viewerIndex = n;
+    renderViewer();
+  }
+
+  $("#viewerPrev").addEventListener("click", (e) => { e.stopPropagation(); viewerStep(-1); });
+  $("#viewerNext").addEventListener("click", (e) => { e.stopPropagation(); viewerStep(1); });
+  $("#viewerClose").addEventListener("click", () => hide("#viewer"));
+  $("#viewerAuthor").addEventListener("click", () => {
+    const p = albumList[viewerIndex];
+    hide("#viewer");
+    hide("#album");
+    openProfile(p.created_by);
+  });
+  $("#viewerMap").addEventListener("click", () => {
+    const p = albumList[viewerIndex];
+    hide("#viewer");
+    hide("#album");
+    map.setView([p.lat, p.lng], Math.max(map.getZoom(), 15));
+    setTimeout(() => openDetail(p), 350);
+  });
+
+  // Glisser à gauche / à droite pour changer de photo
+  let touchX = null;
+  $("#viewerStage").addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  $("#viewerStage").addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 50) viewerStep(dx < 0 ? 1 : -1);
+  });
+  document.addEventListener("keydown", (e) => {
+    if ($("#viewer").classList.contains("hidden")) return;
+    if (e.key === "ArrowLeft") viewerStep(-1);
+    if (e.key === "ArrowRight") viewerStep(1);
+    if (e.key === "Escape") hide("#viewer");
   });
 
   /* ---------------- Installation (Android) ---------------- */
