@@ -1,4 +1,4 @@
-/* Nos Stickers — carte partagée de stickers */
+/* TrioBros — carte partagée de stickers */
 (() => {
   "use strict";
 
@@ -140,7 +140,7 @@
 
   /* ---------------- Démarrage ---------------- */
   async function init() {
-    const name = cfg.APP_NAME || "Nos Stickers";
+    const name = cfg.APP_NAME && cfg.APP_NAME !== "Nos Stickers" ? cfg.APP_NAME : "TrioBros";
     document.title = name;
     document.querySelectorAll(".app-name").forEach((el) => (el.textContent = name));
 

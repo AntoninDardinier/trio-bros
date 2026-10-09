@@ -1,8 +1,8 @@
 // Garde l'app ouvrable même avec un mauvais réseau.
 // Les fichiers de l'app sont toujours pris en ligne en priorité (mises à jour immédiates).
-const CACHE = "nos-stickers-v3";
+const CACHE = "triobros-v1";
 const SHELL = ["./", "./index.html", "./style.css", "./app.js", "./config.js", "./manifest.json",
-  "./icons/icon-192.png", "./icons/icon-512.png"];
+  "./icons/icon-192.png", "./icons/icon-512.png", "./icons/logo.svg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));

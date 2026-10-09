@@ -42,9 +42,8 @@ code { background: var(--line); padding: 1px 6px; border-radius: 6px; }
 }
 .card label { text-align: left; }
 .logo {
-  width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 20px; background: var(--ink);
-  display: grid; place-items: center; font-size: 30px; transform: rotate(-6deg);
-  box-shadow: 0 0 0 4px #fff, 0 0 0 6px var(--line);
+  display: block; width: 84px; height: 84px; margin: 0 auto 14px; border-radius: 22px;
+  box-shadow: 0 10px 26px rgba(14, 19, 48, .28);
 }
 
 /* ---------- Formulaires ---------- */

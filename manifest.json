@@ -1,16 +1,29 @@
 {
-  "name": "Nos Stickers",
-  "short_name": "Stickers",
-  "description": "La carte de nos stickers à travers le monde",
+  "name": "TrioBros",
+  "short_name": "TrioBros",
+  "description": "Nos stickers, partout dans le monde",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#fffaf2",
-  "theme_color": "#1f1b2e",
+  "theme_color": "#0e1330",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Nos Stickers</title>
-  <meta name="theme-color" content="#1f1b2e">
+  <title>TrioBros</title>
+  <meta name="theme-color" content="#0e1330">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Nos Stickers">
+  <meta name="apple-mobile-web-app-title" content="TrioBros">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" href="icons/favicon.png">
+  <link rel="icon" type="image/svg+xml" href="icons/logo.svg">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="style.css">
@@ -20,7 +21,7 @@
   <!-- Écran : configuration manquante -->
   <section id="setup" class="screen hidden">
     <div class="card">
-      <div class="logo">📍</div>
+      <img class="logo" src="icons/logo.svg" alt="">
       <h1>Presque prêt</h1>
       <p>Il manque l'adresse et la clé Supabase dans <code>config.js</code>. Suis l'étape 2 du guide.</p>
     </div>
@@ -29,9 +30,9 @@
   <!-- Écran : connexion -->
   <section id="login" class="screen hidden">
     <form id="loginForm" class="card">
-      <div class="logo">📍</div>
-      <h1 class="app-name">Nos Stickers</h1>
-      <p class="muted">La carte de nos stickers à travers le monde.</p>
+      <img class="logo" src="icons/logo.svg" alt="">
+      <h1 class="app-name">TrioBros</h1>
+      <p class="muted">Nos stickers, partout dans le monde.</p>
       <label>Email<input id="email" type="email" autocomplete="email" required></label>
       <label>Mot de passe<input id="password" type="password" autocomplete="current-password" required></label>
       <p id="loginError" class="error hidden"></p>
@@ -45,7 +46,7 @@
 
     <header class="topbar">
       <div class="title">
-        <strong class="app-name">Nos Stickers</strong>
+        <strong class="app-name">TrioBros</strong>
         <span id="counter">…</span>
       </div>
       <div class="topbar-right">
