@@ -217,7 +217,16 @@
   /* ---------------- Carte ---------------- */
   function initMap() {
     if (map) return;
-    map = L.map("map", { zoomControl: false, worldCopyJump: true, minZoom: 2 }).setView([46.6, 2.5], 3);
+    map = L.map("map", {
+      zoomControl: false,
+      worldCopyJump: true,
+      minZoom: 2,
+      rotate: true,          // rotation de la carte (plugin leaflet-rotate)
+      touchRotate: true,     // tourner avec deux doigts
+      rotateControl: false,  // on utilise notre propre boussole
+      bearing: 0
+    }).setView([46.6, 2.5], 3);
+    map.on("rotate", updateCompass);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -304,6 +313,191 @@
   }
 
   $("#locateBtn").addEventListener("click", () => goToMe(14));
+
+  /* ---------------- Rotation : boussole ---------------- */
+  function updateCompass() {
+    if (!map.getBearing) return;
+    const b = map.getBearing();
+    const tilted = Math.abs(((b % 360) + 360) % 360) > 0.5 && Math.abs(((b % 360) + 360) % 360 - 360) > 0.5;
+    $("#compassBtn").classList.toggle("hidden", !tilted);
+    $("#compassNeedle").style.transform = `rotate(${-b}deg)`;
+  }
+  $("#compassBtn").addEventListener("click", () => {
+    // Retour au nord en douceur
+    const start = map.getBearing();
+    const delta = ((start + 180) % 360) - 180;
+    const t0 = performance.now();
+    (function step(t) {
+      const k = Math.min(1, (t - t0) / 300);
+      map.setBearing(start - delta * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(step);
+      else map.setBearing(0);
+    })(t0);
+  });
+
+  /* ---------------- Recherche ---------------- */
+  let searchTimer = null;
+  let searchAbort = null;
+  let searchMarker = null;
+
+  const norm = (s) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  function openSearch() {
+    show("#searchPanel");
+    document.body.classList.add("searching");
+    const input = $("#searchInput");
+    input.value = "";
+    hide("#searchClear");
+    renderSearch([], "");
+    setTimeout(() => input.focus(), 50);
+  }
+  function closeSearch() {
+    hide("#searchPanel");
+    document.body.classList.remove("searching");
+    $("#searchInput").blur();
+    if (searchAbort) searchAbort.abort();
+  }
+
+  function stickerMatches(q) {
+    const n = norm(q);
+    if (n.length < 2) return [];
+    return pins
+      .filter((p) => norm(p.place).includes(n) || norm(p.note).includes(n) || norm(nameOf(p.created_by, p.author_name)).includes(n))
+      .slice(0, 5);
+  }
+
+  function placeLabel(f) {
+    const p = f.properties || {};
+    const title = p.name || p.street || p.city || "Lieu";
+    const parts = [p.city !== title ? p.city : null, p.state, p.country].filter(Boolean);
+    return { title, sub: [...new Set(parts)].join(", ") };
+  }
+
+  function renderSearch(places, q, loading) {
+    const box = $("#searchResults");
+    box.textContent = "";
+    const mine = stickerMatches(q);
+
+    const section = (title) => {
+      const h = document.createElement("div");
+      h.className = "search-section";
+      h.textContent = title;
+      box.appendChild(h);
+    };
+    const row = (icon, title, sub, onClick) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "search-row";
+      const i = document.createElement("span");
+      i.className = "search-icon";
+      if (icon instanceof HTMLElement) i.appendChild(icon); else i.textContent = icon;
+      const t = document.createElement("span");
+      t.className = "search-text";
+      const s1 = document.createElement("strong");
+      s1.textContent = title;
+      const s2 = document.createElement("small");
+      s2.textContent = sub || "";
+      t.append(s1, s2);
+      b.append(i, t);
+      b.addEventListener("click", onClick);
+      box.appendChild(b);
+    };
+
+    if (mine.length) {
+      section("Nos stickers");
+      mine.forEach((p) => {
+        const av = document.createElement("span");
+        av.className = "avatar sm";
+        setAvatar(av, p.created_by, p.author_name);
+        row(av, p.place || "Sticker", formatDate(p.stuck_on) + (p.note ? " · " + p.note : ""), () => {
+          closeSearch();
+          map.setView([p.lat, p.lng], Math.max(map.getZoom(), 15));
+          setTimeout(() => openDetail(p), 350);
+        });
+      });
+    }
+    if (places.length) {
+      section("Lieux");
+      places.forEach((f) => {
+        const { title, sub } = placeLabel(f);
+        row("📍", title, sub, () => goToPlace(f, title));
+      });
+    }
+    if (!q.trim()) {
+      const e = document.createElement("p");
+      e.className = "search-hint";
+      e.textContent = "Cherche une ville, un pays, un monument… ou un de vos stickers.";
+      box.appendChild(e);
+    } else if (loading && !mine.length) {
+      const e = document.createElement("p");
+      e.className = "search-hint";
+      e.textContent = "Recherche…";
+      box.appendChild(e);
+    } else if (!loading && !mine.length && !places.length) {
+      const e = document.createElement("p");
+      e.className = "search-hint";
+      e.textContent = "Aucun résultat.";
+      box.appendChild(e);
+    }
+  }
+
+  async function searchPlaces(q) {
+    if (searchAbort) searchAbort.abort();
+    searchAbort = new AbortController();
+    try {
+      const c = map.getCenter();
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=fr&limit=6&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&location_bias_scale=0.2`;
+      const r = await fetch(url, { signal: searchAbort.signal });
+      const j = await r.json();
+      renderSearch(j.features || [], q, false);
+    } catch (e) {
+      if (e.name !== "AbortError") renderSearch([], q, false);
+    }
+  }
+
+  function goToPlace(f, title) {
+    closeSearch();
+    const [lng, lat] = f.geometry.coordinates;
+    const ext = f.properties && f.properties.extent; // [ouest, nord, est, sud]
+    if (ext && ext.length === 4) {
+      map.fitBounds([[ext[3], ext[0]], [ext[1], ext[2]]], { padding: [40, 40], maxZoom: 16 });
+    } else {
+      map.setView([lat, lng], 14);
+    }
+    if (searchMarker) searchMarker.remove();
+    searchMarker = L.marker([lat, lng], {
+      icon: L.divIcon({ className: "", html: `<div class="search-dot"></div>`, iconSize: [18, 18] }),
+      interactive: false
+    }).addTo(map);
+    toast(title, 2200);
+  }
+
+  $("#searchBtn").addEventListener("click", openSearch);
+  $("#searchClose").addEventListener("click", closeSearch);
+  $("#searchClear").addEventListener("click", () => {
+    $("#searchInput").value = "";
+    hide("#searchClear");
+    renderSearch([], "");
+    $("#searchInput").focus();
+  });
+  $("#searchInput").addEventListener("input", (e) => {
+    const q = e.target.value;
+    $("#searchClear").classList.toggle("hidden", !q);
+    clearTimeout(searchTimer);
+    if (q.trim().length < 2) {
+      if (searchAbort) searchAbort.abort();
+      return renderSearch([], q, false);
+    }
+    renderSearch([], q, true);
+    searchTimer = setTimeout(() => searchPlaces(q.trim()), 300);
+  });
+  $("#searchInput").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSearch();
+    if (e.key === "Enter") {
+      const first = $("#searchResults .search-row");
+      if (first) first.click();
+    }
+  });
 
   /* ---------------- Placement d'un sticker ---------------- */
   function startPlacing() {

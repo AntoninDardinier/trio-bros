@@ -50,6 +50,9 @@
         <span id="counter">…</span>
       </div>
       <div class="topbar-right">
+        <button id="searchBtn" class="round icon-btn" aria-label="Rechercher">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+        </button>
         <button id="albumBtn" class="round album-btn" aria-label="Album">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>
         </button>
@@ -57,7 +60,20 @@
       </div>
     </header>
 
+    <button id="compassBtn" class="round float-compass hidden" aria-label="Remettre le nord en haut">
+      <svg id="compassNeedle" viewBox="0 0 24 24" width="26" height="26"><path d="M12 2 16 12H8Z" fill="#ff5a4e"/><path d="M12 22 8 12h8Z" fill="#c9c3d1"/></svg>
+    </button>
     <button id="locateBtn" class="round float-locate" aria-label="Me localiser">◎</button>
+
+    <!-- Recherche -->
+    <div id="searchPanel" class="search-panel hidden">
+      <div class="search-bar">
+        <button id="searchClose" class="search-back" aria-label="Fermer la recherche">←</button>
+        <input id="searchInput" type="search" placeholder="Ville, lieu, ou un de nos stickers…" autocomplete="off" enterkeyhint="search">
+        <button id="searchClear" class="search-clear hidden" aria-label="Effacer">✕</button>
+      </div>
+      <div id="searchResults" class="search-results"></div>
+    </div>
     <button id="addBtn" class="btn primary fab">＋ Coller un sticker</button>
 
     <!-- Mode placement -->
@@ -200,6 +216,7 @@
   <div id="toast" class="hidden"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>

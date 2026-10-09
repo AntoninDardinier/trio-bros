@@ -1,6 +1,6 @@
 // Garde l'app ouvrable même avec un mauvais réseau.
 // Les fichiers de l'app sont toujours pris en ligne en priorité (mises à jour immédiates).
-const CACHE = "triobros-v1";
+const CACHE = "triobros-v2";
 const SHELL = ["./", "./index.html", "./style.css", "./app.js", "./config.js", "./manifest.json",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/logo.svg"];
 
