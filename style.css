@@ -393,3 +393,5 @@ body.searching .topbar { visibility: hidden; }
   width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 3px solid #fff;
   box-shadow: 0 0 0 6px rgba(31, 27, 46, .18);
 }
+
+.app-version { text-align: center; font-size: 12px; color: var(--muted); margin: 4px 0 0; }

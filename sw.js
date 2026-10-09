@@ -1,11 +1,12 @@
-// Garde l'app ouvrable même avec un mauvais réseau.
-// Les fichiers de l'app sont toujours pris en ligne en priorité (mises à jour immédiates).
-const CACHE = "triobros-v2";
+// TrioBros — garde l'app ouvrable avec un mauvais réseau.
+// Les fichiers sont TOUJOURS redemandés au serveur (sans cache du navigateur),
+// la copie locale ne sert qu'en cas de coupure réseau.
+const CACHE = "triobros-v3";
 const SHELL = ["./", "./index.html", "./style.css", "./app.js", "./config.js", "./manifest.json",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/logo.svg"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" })))));
   self.skipWaiting();
 });
 
@@ -16,15 +17,18 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
-  const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.origin !== location.origin) return;
+  const req = e.request;
+  const url = new URL(req.url);
+  if (req.method !== "GET" || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy));
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(req, { ignoreSearch: true }))
   );
 });

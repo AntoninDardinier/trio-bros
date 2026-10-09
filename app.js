@@ -2,6 +2,7 @@
 (() => {
   "use strict";
 
+  const APP_VERSION = "1.5";
   const cfg = window.APP_CONFIG || {};
   const $ = (s) => document.querySelector(s);
   const PALETTE = ["#ff5a4e", "#10a99a", "#f7a400", "#7b5cff", "#e0458f", "#3fae4a"];
@@ -741,6 +742,7 @@
     });
 
     $("#profMine").classList.toggle("hidden", !mine);
+    $("#appVersion").textContent = mine ? `TrioBros · version ${APP_VERSION}` : "";
   }
 
   $("#meBtn").addEventListener("click", () => openProfile(user.id));
@@ -1062,7 +1064,11 @@
   });
 
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    window.addEventListener("load", () =>
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+        .then((reg) => reg.update())
+        .catch(() => {})
+    );
   }
 
   init();
