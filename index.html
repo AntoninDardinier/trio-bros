@@ -48,7 +48,7 @@
         <strong class="app-name">Nos Stickers</strong>
         <span id="counter">…</span>
       </div>
-      <button id="menuBtn" class="round" aria-label="Menu">☰</button>
+      <button id="meBtn" class="avatar-btn" aria-label="Mon profil"><span id="meAvatar" class="avatar md"></span></button>
     </header>
 
     <button id="locateBtn" class="round float-locate" aria-label="Me localiser">◎</button>
@@ -91,7 +91,10 @@
       <div class="grab"></div>
       <div id="detailPhotoWrap" class="detail-photo"><img id="detailPhoto" alt=""></div>
       <h2 id="detailPlace"></h2>
-      <p id="detailMeta" class="muted"></p>
+      <div class="detail-meta">
+        <button id="detailAuthor" class="author-chip" type="button"><span id="detailAuthorAv" class="avatar sm"></span><span id="detailAuthorName"></span></button>
+        <span id="detailDate" class="muted"></span>
+      </div>
       <p id="detailNote" class="note"></p>
       <div class="row">
         <button id="detailDelete" class="btn danger hidden">Supprimer</button>
@@ -100,30 +103,53 @@
     </div>
   </div>
 
-  <!-- Feuille : menu -->
-  <div id="menuSheet" class="sheet">
+  <!-- Feuille : profil -->
+  <div id="profileSheet" class="sheet">
     <div class="sheet-inner">
       <div class="grab"></div>
-      <h2 id="menuHello">Salut</h2>
-      <button id="installBtn" class="btn ghost wide hidden">📲 Installer l'app</button>
-      <div class="install-help">
-        <p><strong>Installer sur iPhone :</strong> dans Safari, bouton Partager ⬆️ puis « Sur l'écran d'accueil ».</p>
-        <p><strong>Installer sur Android :</strong> dans Chrome, menu ⋮ puis « Installer l'application » ou « Ajouter à l'écran d'accueil ».</p>
+      <div id="crew" class="crew"></div>
+      <div class="profile-head">
+        <div id="profAvatar" class="avatar xl"></div>
+        <h2 id="profName"></h2>
+        <p id="profSub" class="muted"></p>
       </div>
-      <button id="renameBtn" class="btn ghost wide">Changer mon prénom</button>
-      <button id="logoutBtn" class="btn ghost wide">Se déconnecter</button>
-      <button id="menuClose" class="btn primary wide">Fermer</button>
+      <div class="stats">
+        <div><strong id="statPins">0</strong><span>stickers</span></div>
+        <div><strong id="statCountries">0</strong><span>pays</span></div>
+        <div><strong id="statPhotos">0</strong><span>photos</span></div>
+      </div>
+      <h3 class="section" id="profListTitle">Ses stickers</h3>
+      <ul id="profPins" class="pin-list"></ul>
+      <div id="profMine">
+        <button id="editProfileBtn" class="btn ghost wide">✏️ Modifier mon profil</button>
+        <button id="installBtn" class="btn ghost wide hidden">📲 Installer l'app</button>
+        <details class="install-help">
+          <summary>Installer l'app sur l'écran d'accueil</summary>
+          <p><strong>iPhone :</strong> dans Safari, bouton Partager ⬆️ puis « Sur l'écran d'accueil ».</p>
+          <p><strong>Android :</strong> dans Chrome, menu ⋮ puis « Installer l'application ».</p>
+        </details>
+        <button id="logoutBtn" class="btn ghost wide">Se déconnecter</button>
+      </div>
+      <button id="profileClose" class="btn primary wide">Fermer</button>
     </div>
   </div>
 
-  <!-- Feuille : prénom -->
-  <div id="nameSheet" class="sheet">
-    <form id="nameForm" class="sheet-inner">
+  <!-- Feuille : modifier le profil -->
+  <div id="editSheet" class="sheet">
+    <form id="editForm" class="sheet-inner">
       <div class="grab"></div>
-      <h2>C'est quoi ton prénom ?</h2>
-      <p class="muted">Il s'affichera sur les stickers que tu poses.</p>
-      <label><input id="nameInput" type="text" maxlength="30" required placeholder="Ton prénom"></label>
-      <button type="submit" class="btn primary wide">Valider</button>
+      <h2 id="editTitle">Mon profil</h2>
+      <p id="editSub" class="muted">Ta photo apparaîtra sur les stickers que tu poses.</p>
+      <label class="avatar-pick">
+        <input id="avatarInput" type="file" accept="image/*">
+        <span id="editAvatar" class="avatar xl"></span>
+        <span class="avatar-edit">📷</span>
+      </label>
+      <label>Prénom<input id="nameInput" type="text" maxlength="30" required placeholder="Ton prénom"></label>
+      <div class="row">
+        <button type="button" id="editCancel" class="btn ghost">Annuler</button>
+        <button type="submit" id="editSave" class="btn primary">Enregistrer</button>
+      </div>
     </form>
   </div>
 

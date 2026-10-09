@@ -18,6 +18,11 @@
   let chosenFile = null;
   let currentPin = null;
   let deferredInstall = null;
+  let profiles = {};        // id -> { id, name, avatar_path }
+  let avatarUrls = {};      // chemin -> URL signée
+  let profilesReady = true; // false si la table profiles n'existe pas encore
+  let avatarFile = null;
+  let shownProfile = null;
 
   /* ---------------- Utilitaires ---------------- */
   let toastTimer;
@@ -68,8 +73,64 @@
     });
   }
 
-  function myName() {
-    return (user && user.user_metadata && user.user_metadata.name) || "";
+  function nameOf(uid, fallback) {
+    const p = profiles[uid];
+    if (p && p.name) return p.name;
+    if (user && uid === user.id && user.user_metadata && user.user_metadata.name) return user.user_metadata.name;
+    return fallback || "";
+  }
+  function myName() { return user ? nameOf(user.id) : ""; }
+
+  function avatarUrl(uid) {
+    const p = profiles[uid];
+    return p && p.avatar_path ? avatarUrls[p.avatar_path] || null : null;
+  }
+
+  // Remplit un élément .avatar : photo si dispo, sinon initiale sur la couleur de la personne
+  function setAvatar(el, uid, fallbackName) {
+    el.style.setProperty("--c", colorFor(uid));
+    el.textContent = "";
+    const url = avatarUrl(uid);
+    if (url) {
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = "";
+      el.appendChild(img);
+    } else {
+      el.textContent = (nameOf(uid, fallbackName) || "?").trim().charAt(0).toUpperCase();
+    }
+  }
+
+  function crewIds() {
+    const ids = new Set(Object.keys(profiles));
+    pins.forEach((p) => ids.add(p.created_by));
+    if (user) ids.add(user.id);
+    return [...ids].sort((a, b) => (a === user.id ? -1 : b === user.id ? 1 : nameOf(a).localeCompare(nameOf(b))));
+  }
+
+  /* ---------------- Profils ---------------- */
+  async function loadProfiles() {
+    const { data, error } = await sb.from("profiles").select("*");
+    if (error) {
+      profilesReady = false;
+      console.warn("profiles:", error.message);
+      return;
+    }
+    profilesReady = true;
+    profiles = Object.fromEntries((data || []).map((p) => [p.id, p]));
+    const missing = data.map((p) => p.avatar_path).filter((path) => path && !avatarUrls[path]);
+    if (missing.length) {
+      const res = await sb.storage.from(BUCKET).createSignedUrls(missing, 60 * 60 * 24 * 7);
+      (res.data || []).forEach((u) => { if (u.signedUrl) avatarUrls[u.path] = u.signedUrl; });
+    }
+    refreshAvatars();
+  }
+
+  function refreshAvatars() {
+    if (!user) return;
+    setAvatar($("#meAvatar"), user.id);
+    if (markersLayer) renderPins();
+    if (shownProfile && $("#profileSheet").classList.contains("open")) renderProfile(shownProfile);
   }
 
   /* ---------------- Démarrage ---------------- */
@@ -134,13 +195,17 @@
     hide("#login");
     show("#app");
     initMap();
-    if (!myName()) openSheet("#nameSheet");
+    setAvatar($("#meAvatar"), user.id);
+    loadProfiles().then(() => {
+      if (!myName() || (profilesReady && !profiles[user.id])) openEdit(true);
+    });
     loadPins();
     sb.channel("pins-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "pins" }, () => loadPins())
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => loadProfiles())
       .subscribe();
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") loadPins();
+      if (document.visibilityState === "visible") { loadProfiles(); loadPins(); }
     });
   }
 
@@ -157,11 +222,13 @@
   }
 
   function pinIcon(pin) {
+    const url = avatarUrl(pin.created_by);
+    const inner = url ? `<img src="${url}" alt="">` : "<span></span>";
     return L.divIcon({
       className: "sticker-marker",
-      html: `<div class="pin" style="--c:${colorFor(pin.created_by)}"><span></span></div>`,
-      iconSize: [34, 34],
-      iconAnchor: [17, 40]
+      html: `<div class="pin${url ? " has-av" : ""}" style="--c:${colorFor(pin.created_by)}">${inner}</div>`,
+      iconSize: url ? [42, 42] : [34, 34],
+      iconAnchor: url ? [21, 50] : [17, 40]
     });
   }
 
@@ -174,6 +241,7 @@
     }
     pins = data || [];
     renderPins();
+    if (shownProfile && $("#profileSheet").classList.contains("open")) renderProfile(shownProfile);
   }
 
   function renderPins() {
@@ -363,8 +431,9 @@
   async function openDetail(p) {
     currentPin = p;
     $("#detailPlace").textContent = p.place || "Sticker";
-    const who = p.author_name ? `Posé par ${p.author_name}` : "Posé";
-    $("#detailMeta").textContent = `${who} · ${formatDate(p.stuck_on)}`;
+    setAvatar($("#detailAuthorAv"), p.created_by, p.author_name);
+    $("#detailAuthorName").textContent = nameOf(p.created_by, p.author_name) || "Quelqu'un";
+    $("#detailDate").textContent = formatDate(p.stuck_on);
     $("#detailNote").textContent = p.note || "";
     $("#detailDelete").classList.toggle("hidden", !(user && p.created_by === user.id));
 
@@ -385,6 +454,7 @@
   }
 
   $("#detailClose").addEventListener("click", closeSheets);
+  $("#detailAuthor").addEventListener("click", () => currentPin && openProfile(currentPin.created_by));
 
   $("#detailPhoto").addEventListener("click", () => {
     const src = $("#detailPhoto").src;
@@ -405,35 +475,186 @@
     loadPins();
   });
 
-  /* ---------------- Prénom ---------------- */
-  $("#nameForm").addEventListener("submit", async (e) => {
+  /* ---------------- Page profil ---------------- */
+  function openProfile(uid) {
+    shownProfile = uid;
+    renderProfile(uid);
+    openSheet("#profileSheet");
+  }
+
+  function renderProfile(uid) {
+    const mine = uid === user.id;
+    const theirPins = pins.filter((p) => p.created_by === uid).sort((a, b) => (a.stuck_on < b.stuck_on ? 1 : -1));
+    const fallback = theirPins[0] && theirPins[0].author_name;
+
+    // La bande : les 3 avatars pour passer d'un profil à l'autre
+    const crew = $("#crew");
+    crew.textContent = "";
+    crewIds().forEach((id) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "crew-item" + (id === uid ? " active" : "");
+      const av = document.createElement("span");
+      av.className = "avatar sm";
+      setAvatar(av, id);
+      const n = document.createElement("span");
+      n.textContent = id === user.id ? "Moi" : nameOf(id) || "?";
+      b.append(av, n);
+      b.addEventListener("click", () => openProfile(id));
+      crew.appendChild(b);
+    });
+
+    setAvatar($("#profAvatar"), uid, fallback);
+    $("#profName").textContent = nameOf(uid, fallback) || "Sans prénom";
+    const first = theirPins[theirPins.length - 1];
+    $("#profSub").textContent = first ? `Premier sticker le ${formatDate(first.stuck_on)}` : "Pas encore de sticker posé";
+
+    $("#statPins").textContent = theirPins.length;
+    $("#statCountries").textContent = new Set(theirPins.map((p) => p.country).filter(Boolean)).size;
+    $("#statPhotos").textContent = theirPins.filter((p) => p.photo_path).length;
+
+    $("#profListTitle").textContent = mine ? "Mes stickers" : "Ses stickers";
+    const list = $("#profPins");
+    list.textContent = "";
+    if (!theirPins.length) {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = mine ? "Colle ton premier sticker !" : "Rien pour l'instant.";
+      list.appendChild(li);
+    }
+    theirPins.forEach((p) => {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button";
+      const t = document.createElement("strong");
+      t.textContent = p.place || "Sticker";
+      const d = document.createElement("span");
+      d.textContent = formatDate(p.stuck_on) + (p.photo_path ? " · 📷" : "");
+      b.append(t, d);
+      b.addEventListener("click", () => {
+        closeSheets();
+        map.setView([p.lat, p.lng], Math.max(map.getZoom(), 15));
+        setTimeout(() => openDetail(p), 350);
+      });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+
+    $("#profMine").classList.toggle("hidden", !mine);
+  }
+
+  $("#meBtn").addEventListener("click", () => openProfile(user.id));
+  $("#profileClose").addEventListener("click", closeSheets);
+  $("#logoutBtn").addEventListener("click", async () => { await sb.auth.signOut(); });
+  $("#editProfileBtn").addEventListener("click", () => openEdit(false));
+
+  /* ---------------- Modifier le profil ---------------- */
+  let editIsFirst = false;
+
+  function openEdit(first) {
+    editIsFirst = first;
+    avatarFile = null;
+    $("#avatarInput").value = "";
+    $("#editTitle").textContent = first ? "Bienvenue ! 👋" : "Mon profil";
+    $("#editSub").textContent = first
+      ? "Choisis ton prénom et une photo. Elle apparaîtra sur les stickers que tu poses."
+      : "Ta photo apparaîtra sur les stickers que tu poses.";
+    $("#editCancel").classList.toggle("hidden", first);
+    $("#nameInput").value = myName();
+    setAvatar($("#editAvatar"), user.id);
+    $("#editSave").disabled = false;
+    $("#editSave").textContent = "Enregistrer";
+    openSheet("#editSheet");
+  }
+
+  $("#avatarInput").addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    avatarFile = f;
+    const el = $("#editAvatar");
+    el.textContent = "";
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(f);
+    el.appendChild(img);
+  });
+
+  $("#editCancel").addEventListener("click", () => openProfile(user.id));
+
+  async function squareImage(file, size = 400) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.onerror = () => rej(new Error("image"));
+        i.src = url;
+      });
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const sx = (img.naturalWidth - side) / 2;
+      const sy = (img.naturalHeight - side) / 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = size;
+      canvas.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, size, size);
+      return await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.85));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  $("#editForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = $("#nameInput").value.trim();
     if (!name) return;
-    const { data, error } = await sb.auth.updateUser({ data: { name } });
-    if (error) return toast("Erreur : " + error.message, 4000);
-    user = data.user;
-    closeSheets();
-    toast(`Salut ${name} !`);
-  });
+    const btn = $("#editSave");
+    btn.disabled = true;
+    btn.textContent = "Enregistrement…";
 
-  /* ---------------- Menu ---------------- */
-  $("#menuBtn").addEventListener("click", () => {
-    $("#menuHello").textContent = myName() ? `Salut ${myName()} 👋` : "Salut 👋";
-    openSheet("#menuSheet");
-  });
-  $("#menuClose").addEventListener("click", closeSheets);
-  $("#renameBtn").addEventListener("click", () => {
-    $("#nameInput").value = myName();
-    openSheet("#nameSheet");
-  });
-  $("#logoutBtn").addEventListener("click", async () => {
-    await sb.auth.signOut();
+    // Sans la table profiles (script SQL pas encore lancé) : on garde au moins le prénom
+    if (!profilesReady) {
+      const { data, error } = await sb.auth.updateUser({ data: { name } });
+      btn.disabled = false;
+      btn.textContent = "Enregistrer";
+      if (error) return toast("Erreur : " + error.message, 4000);
+      user = data.user;
+      closeSheets();
+      setAvatar($("#meAvatar"), user.id);
+      return toast("Photo de profil indisponible : lance le script supabase-profils.sql", 5000);
+    }
+
+    const old = profiles[user.id] && profiles[user.id].avatar_path;
+    let newPath = null;
+    try {
+      if (avatarFile) {
+        btn.textContent = "Envoi de la photo…";
+        const blob = await squareImage(avatarFile);
+        newPath = `avatars/${user.id}/${uuid()}.jpg`;
+        const up = await sb.storage.from(BUCKET).upload(newPath, blob, { contentType: "image/jpeg" });
+        if (up.error) throw up.error;
+      }
+      const { error } = await sb.from("profiles").upsert({
+        id: user.id,
+        name,
+        avatar_path: newPath || old || null,
+        updated_at: new Date().toISOString()
+      });
+      if (error) throw error;
+      if (newPath && old) sb.storage.from(BUCKET).remove([old]);
+      sb.auth.updateUser({ data: { name } }).then((r) => { if (r.data && r.data.user) user = r.data.user; });
+      await loadProfiles();
+      toast(editIsFirst ? `Salut ${name} !` : "Profil mis à jour");
+      if (editIsFirst) closeSheets();
+      else openProfile(user.id);
+    } catch (err) {
+      if (newPath) sb.storage.from(BUCKET).remove([newPath]);
+      toast("Oups : " + (err.message || err), 4500);
+      btn.disabled = false;
+      btn.textContent = "Réessayer";
+    }
   });
 
   $("#backdrop").addEventListener("click", () => {
-    // La feuille "prénom" ne se ferme pas tant qu'il n'est pas choisi
-    if ($("#nameSheet").classList.contains("open") && !myName()) return;
+    // Au premier lancement, la fiche profil reste ouverte tant que le prénom n'est pas choisi
+    if ($("#editSheet").classList.contains("open") && editIsFirst) return;
     closeSheets();
   });
 

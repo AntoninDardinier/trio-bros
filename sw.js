@@ -1,6 +1,6 @@
 // Garde l'app ouvrable même avec un mauvais réseau.
 // Les fichiers de l'app sont toujours pris en ligne en priorité (mises à jour immédiates).
-const CACHE = "nos-stickers-v1";
+const CACHE = "nos-stickers-v2";
 const SHELL = ["./", "./index.html", "./style.css", "./app.js", "./config.js", "./manifest.json",
   "./icons/icon-192.png", "./icons/icon-512.png"];
 
